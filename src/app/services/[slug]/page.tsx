@@ -1,0 +1,106 @@
+import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+import { prisma } from "@/lib/prisma";
+import { fallbackServices, ServiceItem } from "@/lib/servicesData";
+import ServiceDetailClient from "./ServiceDetailClient";
+
+export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+
+  let service = null;
+  try {
+    service = await prisma.service.findUnique({
+      where: { slug },
+    });
+  } catch (err) {
+    console.warn("DB unreachable in generateMetadata, using fallback:", err);
+  }
+
+  if (!service) {
+    service = fallbackServices.find((s) => s.slug === slug) as any;
+  }
+
+  if (!service) {
+    return {
+      title: "Service Not Found | BritAsia Agro Limited",
+    };
+  }
+
+  return {
+    title: `${service.name} | BritAsia Agro Limited`,
+    description:
+      service.desc ||
+      "Commercial agro and commodity export specifications by BritAsia Agro Limited.",
+    openGraph: {
+      title: `${service.name} | BritAsia Agro Limited`,
+      description: service.desc,
+      images: [
+        {
+          url: service.image || "/assets/Logo.svg",
+          alt: service.name,
+        },
+      ],
+    },
+  };
+}
+
+export default async function ServiceDetailPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+
+  let service: ServiceItem | null = null;
+
+  try {
+    const dbService = await prisma.service.findUnique({
+      where: { slug },
+    });
+
+    if (dbService) {
+      service = {
+        id: dbService.id,
+        slug: dbService.slug,
+        name: dbService.name,
+        desc: dbService.desc,
+        image: dbService.image,
+        category: dbService.category as any,
+        badge: dbService.badge,
+        breed: dbService.breed,
+        farmingMethod: dbService.farmingMethod,
+        processingMethod: dbService.processingMethod,
+        packaging: dbService.packaging,
+        certifications: dbService.certifications,
+        logistics: dbService.logistics,
+        step1Image: dbService.step1Image,
+        step2Image: dbService.step2Image,
+        step3Image: dbService.step3Image,
+        step4Image: dbService.step4Image,
+        step5Image: dbService.step5Image,
+        order: dbService.order,
+        isActive: dbService.isActive,
+      };
+    }
+  } catch (err) {
+    console.error("Error fetching service from database:", err);
+  }
+
+  // Fallback to static services definition if DB lookup fails
+  if (!service) {
+    service = fallbackServices.find((s) => s.slug === slug) || null;
+  }
+
+  if (!service) {
+    notFound();
+  }
+
+  return <ServiceDetailClient service={service} />;
+}
+

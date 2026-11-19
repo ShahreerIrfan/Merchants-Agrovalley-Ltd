@@ -1,0 +1,86 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  CUSTOMER
+}
+
+enum InquiryStatus {
+  NEW
+  CONTACTED
+  IN_NEGOTIATION
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      Role     @default(CUSTOMER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Service {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  name             String
+  desc             String
+  image            String
+  category         String   // "commodities", "steel", "agro"
+  badge            String   // "Bulk Commodities", "Steel & Metals", "Agriculture"
+  breed            String?  // Breed / Species / Variety
+  farmingMethod    String?  // Farming & Husbandry Method
+  processingMethod String?  // Processing & Cold-Chain Technology
+  packaging        String?  // Available Cuts & Packaging Formats
+  certifications   String?  // Certifications & Compliance
+  logistics        String?  // Export Logistics & Shipping
+  step1Image       String?  // Step 1: Farming / Production image
+  step2Image       String?  // Step 2: Processing image
+  step3Image       String?  // Step 3: Packaging image
+  step4Image       String?  // Step 4: Maritime Export & Shipping image
+  step5Image       String?  // Step 5: Culinary Application image
+  isActive         Boolean  @default(true)
+  order            Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model TradeInquiry {
+  id        String        @id @default(cuid())
+  commodity String
+  volume    String
+  name      String
+  email     String
+  phone     String?
+  company   String?
+  message   String?
+  status    InquiryStatus @default(NEW)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model HeroSlide {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  btn1Text    String?  // Button-01 text
+  btn1Url     String?  // Button-01 URL
+  btn2Text    String?  // Button-02 text
+  btn2Url     String?  // Button-02 URL
+  bgImage     String   // Image for slide background
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

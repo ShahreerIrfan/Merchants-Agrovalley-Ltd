@@ -1,0 +1,65 @@
+# syntax=docker/dockerfile:1
+
+# -----------------------------------------------------------------------------
+# Stage 1: Base image
+# -----------------------------------------------------------------------------
+FROM node:20-alpine AS base
+RUN apk add --no-cache libc6-compat openssl
+WORKDIR /app
+
+# -----------------------------------------------------------------------------
+# Stage 2: Install dependencies
+# -----------------------------------------------------------------------------
+FROM base AS deps
+COPY package.json package-lock.json ./
+COPY prisma ./prisma
+RUN npm install
+
+# -----------------------------------------------------------------------------
+# Stage 3: Build the application
+# -----------------------------------------------------------------------------
+FROM base AS builder
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+ENV NODE_OPTIONS="--max-old-space-size=2048"
+ENV DATABASE_URL="postgresql://postgres:936NqfNbcXQPSnyYpNIB@britasia-britasiaagro-pr0nsu:5432/britasiaagro"
+
+RUN npx prisma generate
+RUN npm run build || npm run build
+
+# -----------------------------------------------------------------------------
+# Stage 4: Production runner (minimal, secure, non-root)
+# -----------------------------------------------------------------------------
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+ENV DATABASE_URL="postgresql://postgres:936NqfNbcXQPSnyYpNIB@britasia-britasiaagro-pr0nsu:5432/britasiaagro"
+
+# Non-root security user
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+# Copy public static files with nextjs ownership
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+# Ensure upload directory exists and is writable by nextjs user
+RUN mkdir -p ./public/uploads && chown -R nextjs:nodejs ./public
+
+# Copy Next.js standalone build and static chunks
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+
+USER nextjs
+
+EXPOSE 3000
+
+CMD ["node", "server.js"]
